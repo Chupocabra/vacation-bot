@@ -6,6 +6,7 @@
 parameters:
     bot.token: '%env(string:TELEGRAM_TOKEN)%'
     bot.group: '%env(string:TELEGRAM_GROUP)%'
+    bot.url: '%env(string:ADMIN_URL)%'
 
 services:
     # default configuration for services in *this* file
@@ -29,6 +30,7 @@ services:
     App\Service\ChatService:
         arguments:
             $groupId: '%bot.group%'
+            $adminUrl: '%bot.url%'
 
     monolog.formatter.session_request:
         class: Monolog\Formatter\LineFormatter

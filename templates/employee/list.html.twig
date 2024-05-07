@@ -1,0 +1,162 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Hello EmployeeController!{% endblock %}
+
+{% block body %}
+<style>
+    .example-wrapper { margin: 1em auto; max-width: 800px; width: 95%; font: 18px/1.5 sans-serif; }
+    .example-wrapper code { background: #F5F5F5; padding: 2px 6px; }
+</style>
+
+<div class="example-wrapper">
+    {% if employees|length %}
+        <div><h4>Сотрудники</h4></div>
+        <ul class="collapsible">
+            {% for employee in employees %}
+                <li>
+                    <div class="collapsible-header" onclick="showVacations({{ employee.id }})">
+                        {{ employee.fullName }}
+                        <a class="secondary-content">
+                            <i id="{{ employee.id }}_button-show" class="material-icons">arrow_drop_up</i>
+                        </a>
+                        <div id="{{ employee.id }}_loader" class="preloader-wrapper small active" style="display: none">
+                            <div class="spinner-layer spinner-green-only">
+                                <div class="circle-clipper left">
+                                    <div class="circle"></div>
+                                </div><div class="gap-patch">
+                                    <div class="circle"></div>
+                                </div><div class="circle-clipper right">
+                                    <div class="circle"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="{{ employee.id }}_vacations" class="collapsible-body">
+                        <form id="{{ employee.id }}_form">
+                            {% set employeeVacations = vacations[employee.id] %}
+                            {% set vacationsCount = employeeVacations|length %}
+
+                            {% if vacationsCount %}
+                                {% for vacation in employeeVacations %}
+                                    {% set lastIndex = loop.index %}
+                                    <div class="row">
+                                        <input class="col s4" id="{{ employee.id }}_{{ loop.index - 1 }}_start" name="{{ vacation.id }}_start" type="date" value="{{ vacation.startDate|date('Y-m-d') }}" placeholder="Start">
+                                        <div class="col s4"></div>
+                                        <input class="col s4" id="{{ employee.id }}_{{ loop.index - 1 }}_end" name="{{ vacation.id }}_end" type="date" value="{{ vacation.endDate|date('Y-m-d') }}" placeholder="End">
+{#                                        <input class="col s4 datepicker" name="{{ vacation.id }}_start" type="text" value="{{ vacation.startDate|date('d.m.Y') }}" placeholder="Start">#}
+{#                                        <div class="col s4"></div>#}
+{#                                        <input class="col s4 datepicker" name="{{ vacation.id }}_end" type="text" value="{{ vacation.endDate|date('d.m.Y') }}" placeholder="End">#}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+
+
+                            {% if vacationsCount < 3 %}
+                                {% for i in vacationsCount..2 %}
+                                    <div class="row">
+{#                                        <input class="col s4 datepicker" name="new_{{ i }}_start" type="text" placeholder="Start">#}
+{#                                        <div class="col s4"></div>#}
+{#                                        <input class="col s4 datepicker" name="new_{{ i }}_end" type="text" placeholder="End">#}
+                                        <input class="col s4" id="{{ employee.id }}_{{ i }}_start" name="new{{ i }}_start" type="date" placeholder="Start">
+                                        <div class="col s4"></div>
+                                        <input class="col s4" id="{{ employee.id }}_{{ i }}_end" name="new{{ i }}_end" type="date" placeholder="End">
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+
+                            <div class="center-align">
+                                <button class="btn waves-effect waves-light" type="button" onclick="saveVacations({{ employee.id }})" name="save_{{ employee.id }}">Save
+                                    <i class="material-icons right">save</i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </li>
+
+            {% endfor %}
+        </ul>
+
+        <div class="center-align">
+            <div class="navigation">
+                {{ knp_pagination_render(employees) }}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        $(document).ready(function(){
+            // TODO думал сделать datepicker, но пока не стал
+            let options = {
+                'autoClose': true,
+                'format': 'dd.mm.yyyy',
+                'firstDay': 1,
+                'showClearBtn': true
+            };
+            $('.datepicker').datepicker(options);
+        });
+
+        function showVacations(id) {
+            let vacations = document.getElementById(id + '_vacations')
+            let button = document.getElementById(id + '_button-show')
+
+            if (vacations.style.display === 'block') {
+                vacations.style.display = 'none'
+                button.textContent = 'arrow_drop_up'
+            } else {
+                vacations.style.display = 'block'
+                button.textContent = 'arrow_drop_down'
+            }
+        }
+
+        function saveVacations(employee) {
+            let inputData = $('#' + employee + '_form')
+            let inputArr = inputData.serializeArray()
+            $('#' + employee + '_loader').css('display', 'block');
+
+            let id1 = inputArr[0].name.split('_')[0];
+            let id2 = inputArr[2].name.split('_')[0];
+            let id3 = inputArr[4].name.split('_')[0];
+
+            let vacations = [
+                {
+                    employee: employee,
+                },
+                {
+                    id: id1,
+                    start: inputArr[0].value,
+                    end: inputArr[1].value,
+                },
+                {
+                    id: id2,
+                    start: inputArr[2].value,
+                    end: inputArr[3].value,
+                },
+                {
+                    id: id3,
+                    start: inputArr[4].value,
+                    end: inputArr[5].value,
+                }
+            ]
+            console.log(vacations)
+
+            $.post("/save", JSON.stringify(vacations), (data, status) => {
+                console.log(data)
+                for (let i = 0; i < 3; i++) {
+                    let start = $('#' + employee + '_' + i + '_start')[0]
+
+                    if (start.name.includes('new') && typeof data[i] != 'undefined' ) {
+                        $('#' + employee + '_' + i + '_start').attr('name', data[i] + '_start')
+                        $('#' + employee + '_' + i + '_end').attr('name', data[i] + '_end')
+                    }
+                }
+                $('.preloader-wrapper').css('display', 'none')
+            });
+        }
+
+    </script>
+{% endblock %}

@@ -2,7 +2,7 @@
 
 namespace App\Messenger\Message;
 
-use App\Entity\Chat;
+use App\Entity\Employee;
 use App\Service\ChatService;
 use App\Service\EmployeeService;
 use App\Service\VacationService;
@@ -27,134 +27,146 @@ class MessageHandler
 
     public function __invoke(Message $message): void
     {
-        $this->logger->debug('Message: ' . print_r($message, true));
+        $this->logger->debug('Message: ' . json_encode($message));
 
-        $chat = $this->chatService->getChat($message->getChat());
-
-        if (null === $chat) {
-            $chat = $this->chatService->newChat($message->getChat());
+        $employee = $this->employeeService->findByChat($message->getChat());
+        if (null === $employee) {
+            $employee = $this->employeeService->new($message->getChat());
         }
 
         $command = $this->chatService->messageToCommand($message->getText());
-        if ($this->chatService::COMMAND_MENU !== $command && null !== $chat->getStep()) {
-            $this->logger->debug('nextStep: ' . $chat->getStep());
-            $this->nextStep($message, $chat);
-
-            return;
+        $step = $employee->getStep();
+        $context = $employee->getContext();
+        if ($this->chatService::COMMAND_MENU !== $command && null !== $employee->getStep()) {
+            $command = $step;
         }
+
+        $this->logger->info(sprintf('Message handling: step %s, context %s', $step, $context), ['chat' => $employee->getChatId()]);
 
         switch ($command) {
             case $this->chatService::COMMAND_MENU:
-                $this->chatService->saveStep($chat);
-                $this->chatService->sendWithMenu($chat->getChatId(), 'message.start');
+                $this->chatService->saveStep($employee);
+                $this->chatService->sendWithMenu($employee, 'message.start');
 
                 break;
 
             case $this->chatService::COMMAND_SET:
-                $this->chatService->saveStep($chat, $this->chatService::COMMAND_SET_FIO);
-                $this->chatService->sendWithToMenu($chat->getChatId(), 'message.fio');
+                $this->commandSet($employee);
 
                 break;
 
-            case $this->chatService::COMMAND_LIST:
-                $this->chatService->saveStep($chat);
-                $closestVacations = $this->vacationService->closestVacationsMessage();
-                $closestVacationsMessage = $this->vacationService->prepareVacationsForChat($closestVacations);
-                $this->chatService->sendWithMenu($chat->getChatId(),'message.closest', $closestVacationsMessage);
-
-                break;
-
-            case $this->chatService::COMMAND_CHANGE:
-                $this->chatService->saveStep($chat, null, 1);
-                $employeesList = $this->employeeService->list();
-                $total = $this->employeeService->total();
-                $this->chatService->sendEmployees($chat->getChatId(), $employeesList, 1, $total);
-
-                break;
-
-            default:
-                $this->chatService->validationError($chat->getChatId());
-        }
-    }
-
-    private function nextStep(Message $message, Chat $chat): void
-    {
-        $step = $chat->getStep();
-        $context = $chat->getContext();
-
-        $stage = '';
-        if (str_contains($chat->getStep(), '-')) {
-            [$step, $stage] = explode('-', $chat->getStep());
-        }
-        $this->logger->info(sprintf('Step handling: step %s, stage %s, context %s', $step, $stage, $context), ['chatter' => $chat->getId()]);
-
-        switch ($step) {
             case $this->chatService::COMMAND_SET_FIO:
-                $this->logger->debug('Create employee');
-
-                if (empty($message->getText())) {
-                    $this->chatService->validationError($chat->getChatId());
-
-                    return;
-                }
-
-                $context = $this->employeeService->save($message->getText());
-                $step = $this->chatService::COMMAND_DATE . '-' . 1;
-                $this->chatService->saveStep($chat, $step, $context);
-                $this->chatService->sendWithToMenu($chat->getChatId(), 'message.date');
+                $context = $this->employeeService->save($employee, $message->getText());
+                $this->chatService->saveStep($employee, $this->chatService::COMMAND_DATE, $context);
+                $this->chatService->sendWithToMenu($employee->getChatId(), 'message.date');
 
                 break;
 
             case $this->chatService::COMMAND_DATE:
-                if ($stage >= $this->chatService::MAX_VACATIONS) {
-                    $this->chatService->saveStep($chat);
-                    $this->chatService->sendWithMenu($chat->getChatId(), 'message.start');
-
-                    return;
-                }
-
                 if (!isset($context)) {
-                    $this->chatService->validationError($chat->getChatId());
+                    $this->chatService->validationError($employee->getChatId());
 
                     return;
                 }
 
-                ++$stage;
+                $curEmployee = $this->employeeService->findById($context);
+                if (null === $curEmployee) {
+                    $this->chatService->validationError($employee->getChatId());
+
+                    return;
+                }
+
+                $vacationNumber = count($curEmployee->getVacations());
+                if ($vacationNumber >= $employee::MAX_VACATIONS) {
+                    $this->chatService->saveStep($employee);
+                    $this->chatService->sendWithMenu($employee, 'message.start');
+
+                    return;
+                }
+
+                $vacationNumber++;
                 if ($this->vacationService->addVacation($context, $message->getText())) {
-                    $step = $this->chatService::COMMAND_DATE . '-' . $stage;
-                    $this->chatService->saveStep($chat, $step, $context);
-                    $this->chatService->sendWithToMenu($chat->getChatId(), 'message.date');
+                    if ($vacationNumber >= $employee::MAX_VACATIONS) {
+                        $this->chatService->saveStep($employee);
+                        $this->chatService->sendWithMenu($employee, 'vacation.add');
+                    } else {
+                        $this->chatService->saveStep($employee, $this->chatService::COMMAND_DATE, $context);
+                        $this->chatService->sendWithToMenu($employee->getChatId(), 'message.date');
+                    }
 
                     return;
                 }
-                $this->chatService->validationError($chat->getChatId());
+                $this->chatService->validationError($employee->getChatId());
 
                 break;
 
             case $this->chatService::CALLBACK_CHANGE_VACATION:
                 if ($this->vacationService->changeVacation($context, $message->getText())) {
-                    $this->chatService->saveStep($chat);
-                    $this->chatService->sendWithMenu($message->getChat(), 'vacation.changed');
+                    $this->chatService->saveStep($employee);
+                    $this->chatService->sendWithMenu($employee, 'vacation.changed');
 
                     return;
                 }
-                $this->chatService->validationError($chat->getChatId());
+                $this->chatService->validationError($employee->getChatId());
 
                 break;
 
             case $this->chatService::CALLBACK_ADD_VACATION:
                 if ($this->vacationService->addVacation($context, $message->getText())) {
-                    $this->chatService->saveStep($chat);
-                    $this->chatService->sendWithMenu($message->getChat(), 'vacation.added');
+                    $this->chatService->saveStep($employee);
+                    $this->chatService->sendWithMenu($employee, 'vacation.add');
 
                     return;
                 }
-                $this->chatService->validationError($chat->getChatId());
+                $this->chatService->validationError($employee->getChatId());
+
+                break;
+
+            case $this->chatService::COMMAND_LIST:
+                if ($employee->getRole() !== $employee::ROLE_EMPLOYEE) {
+                    $this->chatService->saveStep($employee);
+                    $closestVacations = $this->vacationService->closestVacationsMessage();
+                    $closestVacationsMessage = $this->vacationService->prepareVacationsForChat($closestVacations);
+                    $this->chatService->sendWithMenu($employee,'message.closest', $closestVacationsMessage);
+                }
+
+                break;
+
+            case $this->chatService::COMMAND_CHANGE:
+                if ($employee->getRole() !== $employee::ROLE_EMPLOYEE) {
+                    $this->chatService->sendLinkToChangeVacations($employee->getChatId());
+
+                    return;
+                }
+                $employeeVacations = $this->vacationService->employeeVacations($employee->getId());
+                $this->chatService->sendVacations($employee, $employeeVacations);
 
                 break;
 
             default:
-                $this->chatService->validationError($chat->getChatId());
+                $this->chatService->validationError($employee->getChatId());
+        }
+    }
+
+    private function commandSet(Employee $employee): void
+    {
+        if ($employee->getRole() === $employee::ROLE_EMPLOYEE) {
+            if (null !== $employee->getFullName()) {
+                $vacationNumber = count($employee->getVacations());
+                if ($vacationNumber >= $employee::MAX_VACATIONS) {
+                    $this->chatService->saveStep($employee);
+                    $this->chatService->sendWithMenu($employee, 'vacation.full');
+                } else {
+                    $this->chatService->saveStep($employee, $this->chatService::COMMAND_DATE, $employee->getId());
+                    $this->chatService->sendWithToMenu($employee->getChatId(), 'message.date');
+                }
+            } else {
+                $this->chatService->saveStep($employee, $this->chatService::COMMAND_SET_FIO);
+                $this->chatService->sendWithToMenu($employee->getChatId(), 'message.fio');
+            }
+        } else {
+            $this->chatService->saveStep($employee, $this->chatService::COMMAND_SET_FIO);
+            $this->chatService->sendWithToMenu($employee->getChatId(), 'message.fio');
         }
     }
 }

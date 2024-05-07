@@ -8,13 +8,50 @@ use App\Repository\EmployeeRepository;
 class EmployeeService extends AbstractService
 {
     private const CUSTOMERS_ON_PAGE = 3;
-    public function save(string $message): int
+
+    public function findByChat(int $chatId): ?Employee
+    {
+        /** @var EmployeeRepository $employeeRepo */
+        $employeeRepo = $this->em->getRepository(Employee::class);
+
+        return $employeeRepo->findByChatId($chatId);
+    }
+
+    public function findById(int $id): ?Employee
+    {
+        /** @var EmployeeRepository $employeeRepo */
+        $employeeRepo = $this->em->getRepository(Employee::class);
+
+        return $employeeRepo->find($id);
+    }
+
+    public function new(int $chatId): Employee
+    {
+        $this->logger->debug(sprintf('Created new employee %d', $chatId));
+
+        $chat = new Employee();
+        $chat->setChatId($chatId);
+
+        $this->em->persist($chat);
+        $this->em->flush();
+
+        return $chat;
+    }
+
+    public function save(Employee $chatter, string $message): int
     {
         $this->logger->debug('Save employee %s'. $message);
         $fullName = trim($message);
 
-        $employee = new Employee();
+        if ($chatter->getRole() === $chatter::ROLE_ADMIN) {
+            $employee = new Employee();
+            $employee->setFullName($fullName);
+        } else {
+            $employee = $chatter;
+        }
+
         $employee->setFullName($fullName);
+
 
         $this->em->persist($employee);
         $this->em->flush();
@@ -28,16 +65,5 @@ class EmployeeService extends AbstractService
         $employeeRepo = $this->em->getRepository(Employee::class);
 
         return ceil(count($employeeRepo->findAll()) / self::CUSTOMERS_ON_PAGE);
-    }
-
-    /**
-     * @return Employee[]
-     */
-    public function list(int $page = 1): array
-    {
-        /** @var EmployeeRepository $employeeRepo */
-        $employeeRepo = $this->em->getRepository(Employee::class);
-
-        return $employeeRepo->getPageCustomers($page, self::CUSTOMERS_ON_PAGE);
     }
 }

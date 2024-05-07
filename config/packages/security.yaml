@@ -1,0 +1,18 @@
+security:
+    providers:
+        app_user_provider:
+            entity:
+                class: App\Entity\Employee
+                property: chatId
+    firewalls:
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+        main:
+            provider: app_user_provider
+            custom_authenticators:
+                - App\Security\ChatIdAuthenticator
+
+    access_control:
+         - { path: ^/list, roles: ROLE_ADMIN }
+         - { path: ^/save, roles: ROLE_ADMIN }

@@ -3,6 +3,7 @@
 namespace App\Middleware;
 
 use App\Logger\LoggerStorage;
+use App\Messenger\Message\Message;
 use App\Messenger\UniqueIdStamp;
 use Symfony\Component\HttpFoundation\Exception\SessionNotFoundException;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -38,8 +39,15 @@ class LoggerMiddleware implements MiddlewareInterface
             $envelope = $stack->next()->handle($envelope->with($uniqueIdStamp), $stack);
         } else if ($envelope->last(ReceivedStamp::class)) {
             $uniqueIdStamp = $envelope->last(UniqueIdStamp::class);
+
+            $message = $envelope->getMessage();
+            if (!$message instanceof Message) {
+                return $stack->next()->handle($envelope, $stack);
+            }
+            $chatId = $message->getChat();
+
             if ($uniqueIdStamp instanceof UniqueIdStamp && $uniqueIdStamp->getUniqueId()) {
-                $this->loggerStorage->init($uniqueIdStamp->getUniqueId());
+                $this->loggerStorage->init($uniqueIdStamp->getUniqueId(), $chatId);
 
                 $envelope = $stack->next()->handle($envelope, $stack);
             }

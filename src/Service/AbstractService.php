@@ -7,7 +7,6 @@ use Psr\Log\LoggerInterface;
 
 class AbstractService
 {
-    // TODO add log to every action method
     protected EntityManagerInterface $em;
     protected LoggerInterface $logger;
 
