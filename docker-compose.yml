@@ -1,0 +1,60 @@
+version: '3.7'
+services:
+    web:
+        build:
+            context: .
+            dockerfile: .docker/web/Dockerfile
+        depends_on:
+            - app
+        ports:
+            - '84:80'
+        restart: unless-stopped
+        networks:
+            - vacation
+    app:
+        build:
+            context: .
+            dockerfile: .docker/php/Dockerfile
+        working_dir: /app
+        restart: unless-stopped
+        expose:
+            - 9000
+        links:
+            - db
+            - beanstalkd
+        volumes:
+            - ./:/app
+            - ./../supervisord:/supervisord
+            - ./../supervisord-logs:/supervisord-logs
+        networks:
+            - vacation
+        command: sh -c "supervisord -c /etc/supervisord-bot.conf"
+    db:
+        image: mysql:8.0
+        restart: unless-stopped
+        environment:
+            - MYSQL_DATABASE=bot
+            - MYSQL_USER=bot
+            - MYSQL_PASSWORD=bot
+            - MYSQL_ROOT_PASSWORD=bot
+        ports:
+            - '127.0.0.1:3308:3306'
+        volumes:
+            - ./my-db:/var/lib/mysql
+        networks:
+            - vacation
+    beanstalkd:
+        image: schickling/beanstalkd:latest
+        init: true
+        networks:
+            - vacation
+    redis:
+        image: redis:alpine
+        restart: on-failure
+        networks:
+            - vacation
+
+networks:
+    vacation:
+        driver: bridge
+        name: vacation
