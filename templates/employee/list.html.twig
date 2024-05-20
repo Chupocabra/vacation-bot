@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Hello EmployeeController!{% endblock %}
+{% block title %}EmployeeList{% endblock %}
 
 {% block body %}
 <style>
@@ -44,9 +44,6 @@
                                         <input class="col s4" id="{{ employee.id }}_{{ loop.index - 1 }}_start" name="{{ vacation.id }}_start" type="date" value="{{ vacation.startDate|date('Y-m-d') }}" placeholder="Start">
                                         <div class="col s4"></div>
                                         <input class="col s4" id="{{ employee.id }}_{{ loop.index - 1 }}_end" name="{{ vacation.id }}_end" type="date" value="{{ vacation.endDate|date('Y-m-d') }}" placeholder="End">
-{#                                        <input class="col s4 datepicker" name="{{ vacation.id }}_start" type="text" value="{{ vacation.startDate|date('d.m.Y') }}" placeholder="Start">#}
-{#                                        <div class="col s4"></div>#}
-{#                                        <input class="col s4 datepicker" name="{{ vacation.id }}_end" type="text" value="{{ vacation.endDate|date('d.m.Y') }}" placeholder="End">#}
                                     </div>
                                 {% endfor %}
                             {% endif %}
@@ -55,9 +52,6 @@
                             {% if vacationsCount < 3 %}
                                 {% for i in vacationsCount..2 %}
                                     <div class="row">
-{#                                        <input class="col s4 datepicker" name="new_{{ i }}_start" type="text" placeholder="Start">#}
-{#                                        <div class="col s4"></div>#}
-{#                                        <input class="col s4 datepicker" name="new_{{ i }}_end" type="text" placeholder="End">#}
                                         <input class="col s4" id="{{ employee.id }}_{{ i }}_start" name="new{{ i }}_start" type="date" placeholder="Start">
                                         <div class="col s4"></div>
                                         <input class="col s4" id="{{ employee.id }}_{{ i }}_end" name="new{{ i }}_end" type="date" placeholder="End">
@@ -89,17 +83,6 @@
 {% block javascripts %}
     {{ parent() }}
     <script>
-        $(document).ready(function(){
-            // TODO думал сделать datepicker, но пока не стал
-            let options = {
-                'autoClose': true,
-                'format': 'dd.mm.yyyy',
-                'firstDay': 1,
-                'showClearBtn': true
-            };
-            $('.datepicker').datepicker(options);
-        });
-
         function showVacations(id) {
             let vacations = document.getElementById(id + '_vacations')
             let button = document.getElementById(id + '_button-show')

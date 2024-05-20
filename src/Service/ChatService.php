@@ -23,6 +23,7 @@ class ChatService extends AbstractService
     public const COMMAND_CHANGE = 'change';
     public const CALLBACK_CHANGE_VACATION = 'change_vacation';
     public const CALLBACK_ADD_VACATION = 'add_vacation';
+    public const CALLBACK_DEL_VACATION = 'delete_vacation';
 
     public function __construct(
         private readonly TranslatorInterface $translator,
@@ -73,7 +74,7 @@ class ChatService extends AbstractService
         $messageText = $this->translator->trans($translate);
 
         if (null !== $extraMessage) {
-            $messageText .= $extraMessage;
+            $messageText = sprintf($messageText, $extraMessage);
         }
         $this->logger->debug(sprintf('Send with menu message (%s)', $messageText));
 
@@ -128,9 +129,9 @@ class ChatService extends AbstractService
 
     public function sendLinkToChangeVacations(int $chatId): void
     {
-        $messageText = $this->adminUrl . '?token=' . $chatId;
+        $messageText = sprintf('[%s](%s?token=%s)', $this->translator->trans('message.link'), $this->adminUrl, $chatId);
         try {
-            $this->telegramApi->sendMessage($chatId, $messageText);
+            $this->telegramApi->sendMessage($chatId, $messageText, 'MarkdownV2');
         } catch (Exception|InvalidArgumentException $e) {
             $this->logger->error(sprintf('List message error: %s', $e->getMessage()));
         }
@@ -159,12 +160,12 @@ class ChatService extends AbstractService
         $buttons = [];
         foreach ($vacations as $vacation) {
             $buttonText = sprintf(
-                '%s - %s',
+                '%s-%s',
                 $vacation->getStartDate()->format('d.m.Y'),
                 $vacation->getEndDate()->format('d.m.Y')
             );
 
-            $button = [
+            $buttonEdit = [
                 'text' => $buttonText,
                 'callback_data' => json_encode([
                     'command' => self::CALLBACK_CHANGE_VACATION,
@@ -172,7 +173,15 @@ class ChatService extends AbstractService
                 ])
             ];
 
-            $buttons[] = [$button];
+            $buttonDelete = [
+                'text' => $this->translator->trans('vacation.delete'),
+                'callback_data' => json_encode([
+                    'command' => self::CALLBACK_DEL_VACATION,
+                    'data' => $vacation->getId()
+                ])
+            ];
+
+            $buttons[] = [$buttonEdit, $buttonDelete];
         }
 
         if (count($buttons) < $employee::MAX_VACATIONS) {

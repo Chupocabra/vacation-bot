@@ -47,7 +47,7 @@ class VacationRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('v')
             ->andWhere('v.employee = :employeeId')
             ->setParameter('employeeId', $employeeId)
-            ->orderBy('v.id', 'ASC')
+            ->orderBy('v.startDate', 'ASC')
             ->getQuery()
             ->getResult()
         ;
@@ -58,39 +58,20 @@ class VacationRepository extends ServiceEntityRepository
      */
     public function findForRemind(): array
     {
-        $remindDate = new \DateTime('+7 days');
+        $firstRemind = new \DateTime('+7 days');
+        $secondRemind = new \DateTime('+3 days');
+        $thirdRemind = new \DateTime('+1 day');
 
         return $this->createQueryBuilder('v')
-            ->andWhere('v.startDate = :remindDate')
-            ->setParameter('remindDate', $remindDate->format('Y-m-d'))
+            ->where('v.startDate = :firstRemindDate')
+            ->setParameter('firstRemindDate', $firstRemind->format('Y-m-d'))
+            ->orWhere('v.startDate = :secondRemindDate')
+            ->setParameter('secondRemindDate', $secondRemind->format('Y-m-d'))
+            ->orWhere('v.startDate = :thirdRemindDate')
+            ->setParameter('thirdRemindDate', $thirdRemind->format('Y-m-d'))
             ->orderBy('v.id', 'ASC')
             ->getQuery()
             ->getResult()
         ;
     }
-
-    //    /**
-    //     * @return Vacation[] Returns an array of Vacation objects
-    //     */
-    //    public function findByExampleField($value): array
-    //    {
-    //        return $this->createQueryBuilder('v')
-    //            ->andWhere('v.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->orderBy('v.id', 'ASC')
-    //            ->setMaxResults(10)
-    //            ->getQuery()
-    //            ->getResult()
-    //        ;
-    //    }
-
-    //    public function findOneBySomeField($value): ?Vacation
-    //    {
-    //        return $this->createQueryBuilder('v')
-    //            ->andWhere('v.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->getQuery()
-    //            ->getOneOrNullResult()
-    //        ;
-    //    }
 }

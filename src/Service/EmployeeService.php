@@ -7,8 +7,6 @@ use App\Repository\EmployeeRepository;
 
 class EmployeeService extends AbstractService
 {
-    private const CUSTOMERS_ON_PAGE = 3;
-
     public function findByChat(int $chatId): ?Employee
     {
         /** @var EmployeeRepository $employeeRepo */
@@ -57,13 +55,5 @@ class EmployeeService extends AbstractService
         $this->em->flush();
 
         return $employee->getId();
-    }
-
-    public function total(): int
-    {
-        /** @var EmployeeRepository $employeeRepo */
-        $employeeRepo = $this->em->getRepository(Employee::class);
-
-        return ceil(count($employeeRepo->findAll()) / self::CUSTOMERS_ON_PAGE);
     }
 }
