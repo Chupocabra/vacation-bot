@@ -42,7 +42,11 @@
                                     {% set lastIndex = loop.index %}
                                     <div class="row">
                                         <input class="col s4" id="{{ employee.id }}_{{ loop.index - 1 }}_start" name="{{ vacation.id }}_start" type="date" value="{{ vacation.startDate|date('Y-m-d') }}" placeholder="Start">
-                                        <div class="col s4"></div>
+                                        <div class="col s4 center-align">
+                                            <button class="btn waves-effect red accent-1" id="{{ employee.id }}_{{ loop.index - 1 }}_del" type="button" onclick="clearVacation({{ employee.id }}, {{ loop.index - 1 }})">
+                                                <i class="material-icons">delete</i>
+                                            </button>
+                                        </div>
                                         <input class="col s4" id="{{ employee.id }}_{{ loop.index - 1 }}_end" name="{{ vacation.id }}_end" type="date" value="{{ vacation.endDate|date('Y-m-d') }}" placeholder="End">
                                     </div>
                                 {% endfor %}
@@ -94,6 +98,13 @@
                 vacations.style.display = 'block'
                 button.textContent = 'arrow_drop_down'
             }
+        }
+
+        function clearVacation(employee, number) {
+            $('#' + employee + '_' + number + '_start').val('')
+            $('#' + employee + '_' + number + '_end').val('')
+            $('#' + employee + '_' + number + '_del').css('display', 'none')
+
         }
 
         function saveVacations(employee) {

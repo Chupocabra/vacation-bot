@@ -21,6 +21,9 @@ class ChatService extends AbstractService
     public const COMMAND_DATE = 'date';
     public const COMMAND_LIST = 'list';
     public const COMMAND_CHANGE = 'change';
+    public const COMMAND_SET_ALL = 'set_all';
+    public const COMMAND_LIST_ALL = 'list_all';
+    public const COMMAND_CHANGE_ALL = 'change_all';
     public const CALLBACK_CHANGE_VACATION = 'change_vacation';
     public const CALLBACK_ADD_VACATION = 'add_vacation';
     public const CALLBACK_DEL_VACATION = 'delete_vacation';
@@ -57,7 +60,9 @@ class ChatService extends AbstractService
         }
 
         $commands = [
-            self::COMMAND_MENU, self::COMMAND_SET, self::COMMAND_LIST, self::COMMAND_SET_FIO, self::COMMAND_CHANGE
+            self::COMMAND_MENU, self::COMMAND_SET, self::COMMAND_SET_ALL,
+            self::COMMAND_LIST, self::COMMAND_LIST_ALL, self::COMMAND_SET_FIO,
+            self::COMMAND_CHANGE, self::COMMAND_CHANGE_ALL
         ];
 
         foreach ($commands as $command) {
@@ -78,24 +83,24 @@ class ChatService extends AbstractService
         }
         $this->logger->debug(sprintf('Send with menu message (%s)', $messageText));
 
-        if ($chatter->getRole() === $chatter::ROLE_EMPLOYEE) {
-            $buttons = [
-                $this->translator->trans('menu.set'),
-                $this->translator->trans('menu.change'),
-            ];
-        } else {
-            $buttons = [
+        $buttons = [
+            [
                 $this->translator->trans('menu.set'),
                 $this->translator->trans('menu.list'),
                 $this->translator->trans('menu.change'),
+            ]
+        ];
+        if ($chatter->getRole() === $chatter::ROLE_ADMIN) {
+            $buttons[] = [
+                $this->translator->trans('menu.set_all'),
+                $this->translator->trans('menu.list_all'),
+                $this->translator->trans('menu.change_all'),
             ];
         }
 
         try {
             $keyboard = new ReplyKeyboardMarkup(
-                [
-                    $buttons
-                ],
+                $buttons,
                 false,
                 true,
             );

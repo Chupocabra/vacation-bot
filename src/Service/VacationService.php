@@ -22,7 +22,7 @@ class VacationService extends AbstractService
         $this->translator = $translator;
     }
 
-    public function addVacation(int $employeeId, string $message): bool
+    public function addVacation(int $employeeId, string $message): ?Vacation
     {
         $this->logger->debug(sprintf('Add vacation to customer %s, %s', $employeeId, $message));
 
@@ -33,13 +33,25 @@ class VacationService extends AbstractService
         if (null === $employee) {
             $this->logger->error(sprintf('Employee %d not found', $employeeId));
 
-            return false;
+            return null;
         }
 
         $vacation = new Vacation();
 
-        $twoDates = trim($message);
+        if ($this->validateMessageToDate($employee->getId(), $vacation, $message, trim($message))) {
+            $employee->addVacation($vacation);
+            $this->em->persist($vacation);
+            $this->em->flush();
+            $this->logger->debug('Vacation added');
 
+            return $vacation;
+        }
+
+        return null;
+    }
+
+    private function validateMessageToDate(int $employeeId, Vacation $vacation, string $message, string $twoDates): bool
+    {
         foreach (self::DATES_DELIMITERS as $delimiter) {
             if (str_contains($message, $delimiter)) {
                 $dates = explode($delimiter, $twoDates);
@@ -48,6 +60,12 @@ class VacationService extends AbstractService
                 try {
                     $startDate = new \DateTime(trim($startDate));
                     $endDate = new \DateTime(trim($endDate));
+
+                    if ($endDate->diff($startDate)->days < 1) {
+                        $this->logger->error('EndDate less then startDate');
+
+                        return false;
+                    }
                 } catch (\Exception $e) {
                     $this->logger->error(sprintf('Employee %d parsing date error: %s', $employeeId, $e->getMessage()));
 
@@ -57,12 +75,6 @@ class VacationService extends AbstractService
                 $vacation->setStartDate($startDate);
                 $vacation->setEndDate($endDate);
 
-                $employee->addVacation($vacation);
-
-                $this->em->persist($vacation);
-                $this->em->flush();
-                $this->logger->debug('Vacation added');
-
                 return true;
             }
         }
@@ -70,6 +82,11 @@ class VacationService extends AbstractService
         $this->logger->error(sprintf('There only one date in employee %d set vacation message', $employeeId));
 
         return false;
+    }
+
+    public function getFormattedVacationDates(Vacation $vacation): string
+    {
+        return sprintf('%s - %s', $vacation->getStartDate()->format('d.m.Y'), $vacation->getEndDate()->format('d.m.Y'));
     }
 
     /**
@@ -89,21 +106,39 @@ class VacationService extends AbstractService
      * @param Vacation[] $vacations
      * @return string
      */
-    public function prepareVacationsForChat(array $vacations): string
+    public function prepareVacations(Employee $employee, array $vacations): string
+    {
+        $message =  $employee->getFullName();
+        if (empty($vacations)) {
+            $message .= PHP_EOL . $this->translator->trans('vacation.empty');
+        }
+        foreach ($vacations as $vacation) {
+            $message .= sprintf(
+                "\n- %s - %s\n- %s %s\n",
+                $vacation->getStartDate()->format('d.m.Y'), $vacation->getEndDate()->format('d.m.Y'),
+                $vacation->getEndDate()->diff($vacation->getStartDate())->days + 1,
+                $this->translator->trans('message.days')
+            );
+        }
+
+        return PHP_EOL . $message;
+    }
+
+    /**
+     * @param Vacation[] $vacations
+     * @return string
+     */
+    public function prepareVacationsForAll(array $vacations): string
     {
         $employeeCards = [];
         foreach ($vacations as $vacation) {
             $employee = $vacation->getEmployee();
             $fullName = $employee->getFullName();
 
-            if (isset($employeeCards[$fullName])) {
-                $fullName = sprintf('%s (%d)', $fullName, $employee->getId());
-            }
-
-            $employeeCards[$fullName] = sprintf(
-                "\n- %s\n- %s - %s\n- %s %s\n",
+            $employeeCards[] = sprintf(
+                "\n- %s\n- %s\n- %s %s\n",
                 $fullName,
-                $vacation->getStartDate()->format('d.m.Y'), $vacation->getEndDate()->format('d.m.Y'),
+                $this->getFormattedVacationDates($vacation),
                 $vacation->getEndDate()->diff($vacation->getStartDate())->days + 1,
                 $this->translator->trans('message.days')
             );
@@ -126,7 +161,7 @@ class VacationService extends AbstractService
         return $vacationRepo->findByEmployeeId($employeeId);
     }
 
-    public function changeVacation(int $vacationId, string $message): bool
+    public function changeVacation(int $vacationId, string $message): ?Vacation
     {
         $this->logger->info(sprintf('Change %s vacation %s', $vacationId, $message));
 
@@ -136,40 +171,19 @@ class VacationService extends AbstractService
         if (null === $vacation) {
             $this->logger->error(sprintf('Vacation %d not found', $vacationId));
 
-            return false;
+            return null;
         }
 
-        $twoDates = trim($message);
+        if ($this->validateMessageToDate($vacation->getEmployee()->getId(), $vacation, $message, trim($message))) {
+            $this->em->persist($vacation);
+            $this->em->flush();
+            $this->logger->debug('Vacation added');
 
-        foreach (self::DATES_DELIMITERS as $delimiter) {
-            if (str_contains($message, $delimiter)) {
-                $dates = explode($delimiter, $twoDates);
-                $startDate = current($dates);
-                $endDate = end($dates);
-                try {
-                    $startDate = new \DateTime(trim($startDate));
-                    $endDate = new \DateTime(trim($endDate));
-                } catch (\Exception $e) {
-                    $this->logger->error(sprintf('Vacation %d parsing date error: %s', $vacationId, $e->getMessage()));
-
-                    return false;
-                }
-
-                $vacation->setStartDate($startDate);
-                $vacation->setEndDate($endDate);
-
-                $this->em->persist($vacation);
-                $this->em->flush();
-                $this->logger->debug('Vacation added');
-
-                return true;
-            }
+            return $vacation;
         }
+        $this->logger->info(sprintf('Vacation %s not changed', $vacationId));
 
-
-        $this->logger->error(sprintf('There only one date in change vacation %d message', $vacationId));
-
-        return false;
+        return null;
     }
 
     public function deleteVacation(int $vacationId): string

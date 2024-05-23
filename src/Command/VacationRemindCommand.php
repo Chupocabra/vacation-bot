@@ -52,7 +52,7 @@ class VacationRemindCommand extends Command
             return Command::SUCCESS;
         }
 
-        $remindVacationsMessage = $this->vacationService->prepareVacationsForChat($vacations);
+        $remindVacationsMessage = $this->vacationService->prepareVacationsForAll($vacations);
         $this->chatService->sendToGroup($remindVacationsMessage);
 
         return Command::SUCCESS;

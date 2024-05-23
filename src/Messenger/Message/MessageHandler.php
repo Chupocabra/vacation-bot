@@ -51,7 +51,27 @@ class MessageHandler
                 break;
 
             case $this->chatService::COMMAND_SET:
-                $this->commandSet($employee);
+                if (null !== $employee->getFullName()) {
+                    $vacationNumber = count($employee->getVacations());
+                    if ($vacationNumber >= $employee::MAX_VACATIONS) {
+                        $this->chatService->saveStep($employee);
+                        $this->chatService->sendWithMenu($employee, 'vacation.full');
+                    } else {
+                        $this->chatService->saveStep($employee, $this->chatService::COMMAND_DATE, $employee->getId());
+                        $this->chatService->sendWithToMenu($employee->getChatId(), 'message.date');
+                    }
+                } else {
+                    $this->chatService->saveStep($employee, $this->chatService::COMMAND_SET_FIO);
+                    $this->chatService->sendWithToMenu($employee->getChatId(), 'message.fio');
+                }
+
+                break;
+
+            case $this->chatService::COMMAND_SET_ALL:
+                if ($employee->getRole() === $employee::ROLE_ADMIN) {
+                    $this->chatService->saveStep($employee, $this->chatService::COMMAND_SET_FIO);
+                    $this->chatService->sendWithToMenu($employee->getChatId(), 'message.fio');
+                }
 
                 break;
 
@@ -85,11 +105,12 @@ class MessageHandler
                 }
 
                 $vacationNumber++;
-                if ($this->vacationService->addVacation($context, $message->getText())) {
-                    $this->chatService->sendWithMenu($employee, 'vacation.add', $message->getText());
+                $vacation = $this->vacationService->addVacation($context, $message->getText());
+                if (null !== $vacation) {
+                    $text = $this->vacationService->getFormattedVacationDates($vacation);
+                    $this->chatService->sendWithMenu($employee, 'vacation.add', $text);
                     if ($vacationNumber >= $employee::MAX_VACATIONS) {
                         $this->chatService->saveStep($employee);
-                        $this->chatService->sendWithMenu($employee, 'vacation.add', $message->getText());
                     } else {
                         $this->chatService->saveStep($employee, $this->chatService::COMMAND_DATE, $context);
                         $this->chatService->sendWithToMenu($employee->getChatId(), 'message.date');
@@ -102,9 +123,11 @@ class MessageHandler
                 break;
 
             case $this->chatService::CALLBACK_CHANGE_VACATION:
-                if ($this->vacationService->changeVacation($context, $message->getText())) {
+                $vacation = $this->vacationService->changeVacation($context, $message->getText());
+                if (null !== $vacation) {
                     $this->chatService->saveStep($employee);
-                    $this->chatService->sendWithMenu($employee, 'vacation.changed', $message->getText());
+                    $text = $this->vacationService->getFormattedVacationDates($vacation);
+                    $this->chatService->sendWithMenu($employee, 'vacation.changed', $text);
 
                     return;
                 }
@@ -113,9 +136,11 @@ class MessageHandler
                 break;
 
             case $this->chatService::CALLBACK_ADD_VACATION:
-                if ($this->vacationService->addVacation($context, $message->getText())) {
+                $vacation = $this->vacationService->addVacation($context, $message->getText());
+                if (null !== $vacation) {
                     $this->chatService->saveStep($employee);
-                    $this->chatService->sendWithMenu($employee, 'vacation.add', $message->getText());
+                    $text = $this->vacationService->getFormattedVacationDates($vacation);
+                    $this->chatService->sendWithMenu($employee, 'vacation.add', $text);
 
                     return;
                 }
@@ -124,50 +149,38 @@ class MessageHandler
                 break;
 
             case $this->chatService::COMMAND_LIST:
+                $this->chatService->saveStep($employee);
+                $vacations = $this->vacationService->employeeVacations($employee->getId());
+                $vacationsMessage = $this->vacationService->prepareVacations($employee, $vacations);
+                $this->chatService->sendWithMenu($employee,'message.closest', $vacationsMessage);
+
+                break;
+
+            case $this->chatService::COMMAND_LIST_ALL:
                 if ($employee->getRole() === $employee::ROLE_ADMIN) {
                     $this->chatService->saveStep($employee);
                     $closestVacations = $this->vacationService->closestVacations();
-                    $closestVacationsMessage = $this->vacationService->prepareVacationsForChat($closestVacations);
+                    $closestVacationsMessage = $this->vacationService->prepareVacationsForAll($closestVacations);
                     $this->chatService->sendWithMenu($employee,'message.closest', $closestVacationsMessage);
                 }
 
                 break;
 
             case $this->chatService::COMMAND_CHANGE:
-                if ($employee->getRole() === $employee::ROLE_ADMIN) {
-                    $this->chatService->sendLinkToChangeVacations($employee->getChatId());
-
-                    return;
-                }
                 $employeeVacations = $this->vacationService->employeeVacations($employee->getId());
                 $this->chatService->sendVacations($employee, $employeeVacations);
 
                 break;
 
+            case $this->chatService::COMMAND_CHANGE_ALL:
+                if ($employee->getRole() === $employee::ROLE_ADMIN) {
+                    $this->chatService->sendLinkToChangeVacations($employee->getChatId());
+                }
+
+                break;
+
             default:
                 $this->chatService->validationError($employee->getChatId());
-        }
-    }
-
-    private function commandSet(Employee $employee): void
-    {
-        if ($employee->getRole() === $employee::ROLE_EMPLOYEE) {
-            if (null !== $employee->getFullName()) {
-                $vacationNumber = count($employee->getVacations());
-                if ($vacationNumber >= $employee::MAX_VACATIONS) {
-                    $this->chatService->saveStep($employee);
-                    $this->chatService->sendWithMenu($employee, 'vacation.full');
-                } else {
-                    $this->chatService->saveStep($employee, $this->chatService::COMMAND_DATE, $employee->getId());
-                    $this->chatService->sendWithToMenu($employee->getChatId(), 'message.date');
-                }
-            } else {
-                $this->chatService->saveStep($employee, $this->chatService::COMMAND_SET_FIO);
-                $this->chatService->sendWithToMenu($employee->getChatId(), 'message.fio');
-            }
-        } else {
-            $this->chatService->saveStep($employee, $this->chatService::COMMAND_SET_FIO);
-            $this->chatService->sendWithToMenu($employee->getChatId(), 'message.fio');
         }
     }
 }
