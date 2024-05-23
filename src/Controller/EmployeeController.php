@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Employee;
 use App\Entity\Vacation;
+use App\Repository\VacationRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,6 +27,9 @@ class EmployeeController extends AbstractController
             ->addOrderBy('e.fullName', 'ASC')
         ;
 
+        /** @var VacationRepository $vacationRepo */
+        $vacationRepo = $this->em->getRepository(Vacation::class);
+
         $employees = $paginator->paginate(
             $employeeQueryBuilder->getQuery(),
             $request->query->getInt('page', 1),
@@ -34,7 +38,8 @@ class EmployeeController extends AbstractController
 
         $vacations = [];
         foreach ($employees as $employee) {
-            $vacations[$employee->getId()] = $employee->getVacations();
+            $employeeId = $employee->getId();
+            $vacations[$employeeId] = $vacationRepo->findByEmployeeId($employeeId);
         }
 
         return $this->render('employee/list.html.twig', [
