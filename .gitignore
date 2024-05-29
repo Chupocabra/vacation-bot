@@ -8,4 +8,5 @@
 /var/
 /vendor/
 /.idea/
+/my-db/
 ###< symfony/framework-bundle ###

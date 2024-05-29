@@ -93,4 +93,42 @@ class EmployeeController extends AbstractController
 
         return $this->json($result);
     }
+
+    #[Route('/new', name: 'employee_new', methods: 'POST')]
+    public function new(Request $request): Response
+    {
+        $data = json_decode($request->getContent(), true);
+
+        $employeeName = array_shift($data)['employee'];
+        if (empty($employeeName)) {
+            return $this->json(['error' => 'Full name must be provided'], 400);
+        }
+
+        $employee = new Employee();
+        $employee->setFullName($employeeName);
+
+        $this->em->persist($employee);
+
+        try {
+            foreach ($data as $item) {
+                if (empty($item['start']) || empty($item['end'])) {
+                    continue;
+                }
+                $vacation = new Vacation();
+
+                $vacation->setStartDate(new \DateTime($item['start']));
+                $vacation->setEndDate(new \DateTime($item['end']));
+                $vacation->setEmployee($employee);
+
+                $this->em->persist($vacation);
+            }
+        } catch (\Exception $e) {
+            return $this->json([
+                'message' => $e->getMessage()
+            ], 400);
+        }
+        $this->em->flush();
+
+        return $this->json(['employee' => $employee->getId()]);
+    }
 }

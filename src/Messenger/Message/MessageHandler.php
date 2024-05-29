@@ -2,7 +2,6 @@
 
 namespace App\Messenger\Message;
 
-use App\Entity\Employee;
 use App\Service\ChatService;
 use App\Service\EmployeeService;
 use App\Service\VacationService;

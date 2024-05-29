@@ -9,8 +9,58 @@
 </style>
 
 <div class="example-wrapper">
+    <div class="collapsible">
+        <div class="collapsible-header" onclick="newEmployee()">
+            {{ 'html.add'|trans }}
+            <a class="secondary-content">
+                <i id="button-add" class="material-icons">add_circle_outline</i>
+            </a>
+            <div id="new_loader" class="preloader-wrapper small active" style="display: none">
+                <div class="spinner-layer spinner-green-only">
+                    <div class="circle-clipper left">
+                        <div class="circle"></div>
+                    </div><div class="gap-patch">
+                        <div class="circle"></div>
+                    </div><div class="circle-clipper right">
+                        <div class="circle"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="new_vacations" class="collapsible-body">
+            <form id="new_form">
+                <div class="input-field">
+                    <input id="new_name" type="text" class="validate" name="new_name">
+                    <label for="new_name">{{ 'html.fullname'|trans }}</label>
+                    <span class="helper-text red-text"></span>
+                </div>
+
+                {% for i in 0..2 %}
+                    <div class="row">
+                        <input class="col s4" id="new_{{ loop.index }}_start" name="new{{ loop.index }}_start" type="date" placeholder="Start">
+                        <div class="col s4"></div>
+                        <input class="col s4" id="new_{{ loop.index }}_end" name="new{{ loop.index }}_end" type="date" placeholder="End">
+                    </div>
+                {% endfor %}
+
+                <div class="center-align">
+                    <button class="btn waves-effect waves-light" type="button" onclick="saveNewEmployee()">Save
+                        <i class="material-icons right">save</i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     {% if employees|length %}
-        <div><h4>Сотрудники</h4></div>
+        <div><h4>{{ 'html.list'|trans }}</h4></div>
+
+        <div class="center-align">
+            <div class="navigation">
+                {{ knp_pagination_render(employees) }}
+            </div>
+        </div>
+
         <ul class="collapsible">
             {% for employee in employees %}
                 <li>
@@ -136,10 +186,8 @@
                     end: inputArr[5].value,
                 }
             ]
-            console.log(vacations)
 
             $.post("/save", JSON.stringify(vacations), (data, status) => {
-                console.log(data)
                 for (let i = 0; i < 3; i++) {
                     let start = $('#' + employee + '_' + i + '_start')[0]
 
@@ -148,6 +196,68 @@
                         $('#' + employee + '_' + i + '_end').attr('name', data[i] + '_end')
                     }
                 }
+                $('.preloader-wrapper').css('display', 'none')
+            });
+        }
+
+        function newEmployee() {
+            let vacations = document.getElementById('new_vacations')
+            let button = document.getElementById('button-add')
+
+            if (vacations.style.display === 'block') {
+                vacations.style.display = 'none'
+                button.textContent = 'add_circle_outline'
+            } else {
+                vacations.style.display = 'block'
+                button.textContent = 'arrow_drop_down'
+            }
+        }
+
+        function saveNewEmployee() {
+            $('#new_loader').css('display', 'block');
+
+            let helper = $('.helper-text')
+            helper.html('')
+
+            let inputData = $('#new_form')
+            let inputArr = inputData.serializeArray()
+
+            if (inputArr[0].value === '') {
+                $('.preloader-wrapper').css('display', 'none')
+                helper.html('{{ 'html.name_empty'|trans }}')
+
+                return;
+            }
+
+            let id1 = inputArr[1].name.split('_')[0];
+            let id2 = inputArr[3].name.split('_')[0];
+            let id3 = inputArr[5].name.split('_')[0];
+
+            let vacations = [
+                {
+                    employee: inputArr[0].value,
+                },
+                {
+                    id: id1,
+                    start: inputArr[1].value,
+                    end: inputArr[2].value,
+                },
+                {
+                    id: id2,
+                    start: inputArr[3].value,
+                    end: inputArr[4].value,
+                },
+                {
+                    id: id3,
+                    start: inputArr[5].value,
+                    end: inputArr[6].value,
+                }
+            ]
+
+            inputData[0].reset()
+
+            $.post("/new", JSON.stringify(vacations), () => {
+                M.toast({html: '{{ 'html.added'|trans }}'})
                 $('.preloader-wrapper').css('display', 'none')
             });
         }
